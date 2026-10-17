@@ -1057,8 +1057,8 @@ def _matches_globstar_segments(rel: str, pattern: str) -> bool:
     if "**" not in pattern_parts[:-1]:
         return False
     reachable = {0}
-    for index, token in enumerate(pattern_parts):
-        if token == "**" and index < len(pattern_parts) - 1:
+    for token in pattern_parts:
+        if token == "**":
             reachable = set(range(min(reachable), len(path_parts) + 1))
         else:
             reachable = {
