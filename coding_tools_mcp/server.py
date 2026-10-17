@@ -1046,35 +1046,37 @@ def normalize_rel_display(path: Path, root: Path) -> str:
     return "." if text == "" else text
 
 
-@functools.lru_cache(maxsize=256)
-def globstar_variants(pattern: str) -> tuple[str, ...]:
-    """The pattern plus every spelling with a `**/` segment matching zero directories.
+def _matches_globstar_segments(rel: str, pattern: str) -> bool:
+    """Allow `**/` to consume zero or more path segments without expanding patterns.
 
-    Neither fnmatch nor PurePosixPath.match (before 3.13) lets `**/` match an
-    empty segment, so `src/**/*.py` missed `src/m.py` and `**/*.py` missed root
-    files, unlike the fd and rg engines.
+    The reachable path positions are bounded by path depth, preventing the
+    exponential expansion caused by enumerating optional globstar segments.
     """
-    variants = {pattern}
-    pending = [pattern]
-    while pending:
-        current = pending.pop()
-        candidates = [current[3:]] if current.startswith("**/") else []
-        start = current.find("/**/")
-        while start != -1:
-            candidates.append(current[:start] + current[start + 3 :])
-            start = current.find("/**/", start + 1)
-        for candidate in candidates:
-            if candidate and candidate not in variants:
-                variants.add(candidate)
-                pending.append(candidate)
-    return tuple(sorted(variants))
+    path_parts = rel.split("/")
+    pattern_parts = pattern.split("/")
+    if "**" not in pattern_parts[:-1]:
+        return False
+    reachable = {0}
+    for index, token in enumerate(pattern_parts):
+        if token == "**" and index < len(pattern_parts) - 1:
+            reachable = set(range(min(reachable), len(path_parts) + 1))
+        else:
+            reachable = {
+                position + 1
+                for position in reachable
+                if position < len(path_parts) and fnmatch.fnmatch(path_parts[position], token)
+            }
+        if not reachable:
+            return False
+    return len(path_parts) in reachable
 
 
 def matches_any_glob(rel: str, patterns: list[str]) -> bool:
     return any(
-        fnmatch.fnmatch(rel, variant) or PurePosixPath(rel).match(variant)
+        fnmatch.fnmatch(rel, pattern)
+        or PurePosixPath(rel).match(pattern)
+        or _matches_globstar_segments(rel, pattern)
         for pattern in patterns
-        for variant in globstar_variants(pattern)
     )
 
 

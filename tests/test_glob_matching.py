@@ -6,11 +6,19 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from coding_tools_mcp import server as server_module
-from coding_tools_mcp.server import Runtime, matches_any_glob
+from coding_tools_mcp.server import Runtime, _matches_globstar_segments, matches_any_glob
 
 
 class GlobstarMatchingTests(unittest.TestCase):
     """`**/` matches zero or more directories, as in fd, rg and gitignore."""
+
+    def test_many_globstar_segments_do_not_expand_exponentially(self) -> None:
+        for count in (3, 6, 10, 24):
+            with self.subTest(count=count):
+                pattern = "/".join(f"**/dir{i}" for i in range(count)) + "/file.py"
+                path = "/".join(f"dir{i}" for i in range(count)) + "/file.py"
+                self.assertTrue(_matches_globstar_segments(path, pattern))
+                self.assertFalse(_matches_globstar_segments(path + ".txt", pattern))
 
     def test_globstar_matches_zero_or_more_directories(self) -> None:
         cases = [
