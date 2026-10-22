@@ -25,8 +25,6 @@ class GlobstarMatchingTests(unittest.TestCase):
     def test_globstar_matches_zero_or_more_directories(self) -> None:
         cases = [
             ("src/m.py", "src/**/*.py", True),
-            ("pkg/src/m.py", "src/**/*.py", True),
-            ("pkg/src/deep/m.py", "src/**/*.py", True),
             ("src/deep/er/d.py", "src/**/*.py", True),
             ("root.py", "**/*.py", True),
             ("src/m.py", "**/*.py", True),
@@ -66,25 +64,6 @@ class GlobstarMatchingTests(unittest.TestCase):
             [f["path"] for f in everything["files"]], ["root.py", "src/deep/d.py", "src/m.py"]
         )
         self.assertEqual(found["total_matches"], 2)
-
-    def test_python_fallback_matches_nested_relative_globs(self) -> None:
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            for rel in ("pkg/src/m.py", "pkg/src/deep/d.py", "other/m.py"):
-                path = root / rel
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text("def f():\n    pass\n", encoding="utf-8")
-            runtime = Runtime(root)
-            runtime.workspace.git_path = None
-            try:
-                with patch.object(server_module, "cached_which", return_value=None):
-                    listed = runtime.list_files({"glob": "src/**/*.py"})
-                    found = runtime.search_text({"query": "def f", "include_globs": ["src/**/*.py"]})
-            finally:
-                runtime.close()
-        expected = ["pkg/src/deep/d.py", "pkg/src/m.py"]
-        self.assertEqual([item["path"] for item in listed["files"]], expected)
-        self.assertEqual(sorted(item["path"] for item in found["matches"]), expected)
 
     def test_python_fallback_excludes_descendants_but_keeps_named_regular_files(self) -> None:
         with TemporaryDirectory() as tmp:

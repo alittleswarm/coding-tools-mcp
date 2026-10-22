@@ -1056,9 +1056,7 @@ def _matches_globstar_segments(rel: str, pattern: str) -> bool:
     pattern_parts = pattern.split("/")
     if "**" not in pattern_parts[:-1]:
         return False
-    # Relative glob patterns may match suffixes of nested paths, as with
-    # PurePosixPath.match and fd's implicit **/ prefix.
-    reachable = set(range(len(path_parts)))
+    reachable = {0}
     for index, token in enumerate(pattern_parts):
         if token == "**":
             start = min(reachable)
