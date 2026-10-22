@@ -1056,10 +1056,16 @@ def _matches_globstar_segments(rel: str, pattern: str) -> bool:
     pattern_parts = pattern.split("/")
     if "**" not in pattern_parts[:-1]:
         return False
-    reachable = {0}
-    for token in pattern_parts:
+    # Relative glob patterns may match suffixes of nested paths, as with
+    # PurePosixPath.match and fd's implicit **/ prefix.
+    reachable = set(range(len(path_parts)))
+    for index, token in enumerate(pattern_parts):
         if token == "**":
-            reachable = set(range(min(reachable), len(path_parts) + 1))
+            start = min(reachable)
+            # A trailing /** matches descendants, not the named file itself.
+            if index == len(pattern_parts) - 1:
+                start += 1
+            reachable = set(range(start, len(path_parts) + 1))
         else:
             reachable = {
                 position + 1
